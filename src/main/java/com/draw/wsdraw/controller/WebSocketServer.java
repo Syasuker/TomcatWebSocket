@@ -1,5 +1,6 @@
 package com.draw.wsdraw.controller;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.websocket.*;
@@ -10,9 +11,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @ServerEndpoint("/webSocket/{roomId}")
 @Component
 public class WebSocketServer {
+    // 主要是存 roomid的
     private static ConcurrentHashMap<String, List<WebSocketServer>> webSocketMap =
             new ConcurrentHashMap<>(3);
 
@@ -34,7 +37,7 @@ public class WebSocketServer {
         this.roomId = roomId;
         addSocketServer2Map(this);
         try {
-            sendMessage("连接成功", true);
+            sendMessage(session, "连接成功", true);
         } catch (IOException e) {
         }
     }
@@ -91,19 +94,21 @@ public class WebSocketServer {
      * 群发自定义消息
      */
     public static void sendInfo(String message, @PathParam("roomId") String roomId, Session session) {
+        log.info("roomid={}, sessionid={}, content={}", roomId, session.getId(), message);
         if (roomId == null || roomId.isEmpty() || session == null) return;
         List<WebSocketServer> wssList = webSocketMap.get(roomId);
         for (WebSocketServer item : wssList) {
             try {
                 if (session.getId().equals(item.session.getId())) {
-                    item.sendMessage("已收到信息", true);
-                    continue;
+                    item.sendMessage(session, "已收到信息", true);
+                }else {
+                    item.sendMessage(item.session, message, true);
                 }
-                item.sendMessage(message, false);
             } catch (IOException e) {
-                continue;
+                e.printStackTrace();
             }
         }
+
     }
 
     public String getClientMessage(String message) {
@@ -125,13 +130,14 @@ public class WebSocketServer {
                 webSocketMap.put(wss.roomId, wssList);
             }
             wssList.add(wss);
+            log.info("看看");
         }
     }
 
     /**
      * 实现服务器主动发送消息
      */
-    public void sendMessage(String message, boolean isDirect) throws IOException {
-        this.session.getBasicRemote().sendText(isDirect ? message :getClientMessage(message));
+    public void sendMessage(Session session, String message, boolean isDirect) throws IOException {
+        session.getBasicRemote().sendText(isDirect ? message :getClientMessage(message));
     }
 }

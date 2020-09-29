@@ -39,7 +39,8 @@
 
     function connect(){
         var roomId = $('#roomId').val();
-        ws = new WebSocket('ws://localhost:8080/webSocket/' + roomId);
+        ws = new WebSocket('ws://localhost:8081/webSocket/' + roomId);
+
         ws.onopen = WSonOpen;
         ws.onmessage = WSonMessage;
         ws.onclose = WSonClose;
@@ -95,5 +96,6 @@
          var response = $("#response").val();
          $("#response").val(response+message.name+': '+message.chatContent+'\n');
     }
+
 </script>
 </html>
