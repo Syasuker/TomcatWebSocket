@@ -1,5 +1,8 @@
 package com.draw.wsdraw.controller;
 
+import com.draw.wsdraw.model.User;
+import com.draw.wsdraw.utils.JsonMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -9,10 +12,11 @@ import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
-@ServerEndpoint("/webSocket/{roomId}")
+@ServerEndpoint("/webSocket/{roomId}/usrname/{name}")
 @Component
 public class WebSocketServer {
     // 主要是存 roomid的
@@ -21,20 +25,21 @@ public class WebSocketServer {
 
     //与某个客户端的连接会话，需要通过它来给客户端发送数据
     private Session session;
-
+    private User user;
     //接收roomId
     private String roomId = "";
-
-
 
     /**
      * 连接建立成功调用的方法
      */
     @OnOpen
-    public void onOpen(Session session, @PathParam("roomId") String roomId) {
+    public void onOpen(Session session, @PathParam("roomId") String roomId, @PathParam("name") String name) {
         if (roomId == null || roomId.isEmpty()) return;
         this.session = session;
         this.roomId = roomId;
+        this.user = new User();
+        this.user.setId(session.getId());
+        this.user.setName(name);
         addSocketServer2Map(this);
         try {
             sendMessage(session, "连接成功", true);
@@ -68,10 +73,11 @@ public class WebSocketServer {
      */
     @OnMessage
     public void onMessage(String message, Session session) {
+        JsonNode json = new JsonMapper().fromJson(message, JsonNode.class);
         //群发消息
         String msg = filterMessage(message);
         if (msg != null) {
-            sendInfo(msg, roomId, session);
+            sendInfo(msg, json.get("roomId").asText(), session);
         }
     }
 
@@ -95,6 +101,8 @@ public class WebSocketServer {
      */
     public static void sendInfo(String message, @PathParam("roomId") String roomId, Session session) {
         log.info("roomid={}, sessionid={}, content={}", roomId, session.getId(), message);
+        JsonNode msg = new JsonMapper().fromJson(message, JsonNode.class);
+
         if (roomId == null || roomId.isEmpty() || session == null) return;
         List<WebSocketServer> wssList = webSocketMap.get(roomId);
         for (WebSocketServer item : wssList) {
@@ -102,7 +110,7 @@ public class WebSocketServer {
                 if (session.getId().equals(item.session.getId())) {
                     item.sendMessage(session, "已收到信息", true);
                 }else {
-                    item.sendMessage(item.session, message, true);
+                    item.sendMessage(item.session, item.user.getName()+":"+msg.get("chatContent").asText(), true);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -130,7 +138,7 @@ public class WebSocketServer {
                 webSocketMap.put(wss.roomId, wssList);
             }
             wssList.add(wss);
-            log.info("看看");
+            log.info("WebSocketServer={}", wss);
         }
     }
 
@@ -140,4 +148,5 @@ public class WebSocketServer {
     public void sendMessage(Session session, String message, boolean isDirect) throws IOException {
         session.getBasicRemote().sendText(isDirect ? message :getClientMessage(message));
     }
+
 }

@@ -39,7 +39,8 @@
 
     function connect(){
         var roomId = $('#roomId').val();
-        ws = new WebSocket('ws://localhost:8081/webSocket/' + roomId);
+        var name = $('#name').val();
+        ws = new WebSocket('ws://localhost:8081/webSocket/' + roomId + '/usrname/' + name);
 
         ws.onopen = WSonOpen;
         ws.onmessage = WSonMessage;
